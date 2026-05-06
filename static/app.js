@@ -5,11 +5,14 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
 async function api(path, body) {
   const opts = body
-    ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
-    : { method: "POST" };
+    ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), credentials: "include" }
+    : { method: "POST", credentials: "include" };
   if (path.startsWith("/api/pending") || path.startsWith("/api/prime")) opts.method = "GET";
   if (opts.method === "GET") delete opts.body;
-  const res = await fetch(path, opts);
+  // Strip any credentials from the document URL (basic-auth tunnels) — fetch
+  // disallows constructing requests from URLs that contain credentials.
+  const url = new URL(path, location.origin).toString();
+  const res = await fetch(url, opts);
   if (!res.ok) {
     const txt = await res.text();
     throw new Error(`${res.status}: ${txt}`);
