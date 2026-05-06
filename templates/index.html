@@ -11,8 +11,8 @@
     <h1>Binance Square — Content Engine</h1>
     <p class="sub">
       Smart Posting Assistant · Top 10 (Write to Earn) ·
-      OpenAI: <span class="{% if has_openai %}ok{% else %}warn{% endif %}">
-        {% if has_openai %}connected{% else %}NOT connected (using fallback templates){% endif %}
+      Gemini: <span class="{% if has_llm %}ok{% else %}warn{% endif %}">
+        {% if has_llm %}connected{% else %}NOT connected (using fallback templates){% endif %}
       </span>
     </p>
   </header>

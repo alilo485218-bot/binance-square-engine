@@ -8,7 +8,7 @@ Three prompt types:
 Each generated post is a JSON object with: type, coin, cashtag, hook, hook_keywords,
 body, direction, cta.
 
-Falls back to a deterministic template if OPENAI_API_KEY is missing, so the rest of
+Falls back to a deterministic template if GEMINI_API_KEY is missing, so the rest of
 the pipeline (selector, image generator, scheduler) keeps working without an LLM.
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ import re
 import uuid
 from typing import Any
 
-from openai import OpenAI
+import google.generativeai as genai
 
 import config
 
@@ -65,19 +65,20 @@ def _strip_json_fences(text: str) -> str:
     return text
 
 
-def _call_openai(prompt: str) -> str:
-    client = OpenAI(api_key=config.OPENAI_API_KEY)
-    resp = client.chat.completions.create(
-        model=config.OPENAI_MODEL,
-        messages=[
-            {"role": "system",
-             "content": "You output ONLY valid JSON. No markdown, no commentary."},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.85,
-        response_format={"type": "json_object"},
+def _call_gemini(prompt: str) -> str:
+    genai.configure(api_key=config.GEMINI_API_KEY)
+    model = genai.GenerativeModel(
+        config.GEMINI_MODEL,
+        system_instruction="You output ONLY valid JSON. No markdown, no commentary.",
     )
-    return resp.choices[0].message.content or ""
+    resp = model.generate_content(
+        prompt,
+        generation_config={
+            "temperature": 0.85,
+            "response_mime_type": "application/json",
+        },
+    )
+    return resp.text or ""
 
 
 def _fallback_post(prompt_type: str, signal: dict[str, Any]) -> dict[str, Any]:
@@ -147,16 +148,16 @@ def generate_post(prompt_type: str, signal: dict[str, Any]) -> dict[str, Any]:
     if prompt_type not in PROMPT_TYPES:
         raise ValueError(f"prompt_type must be one of {PROMPT_TYPES}")
 
-    if not config.HAS_OPENAI:
+    if not config.HAS_LLM:
         post = _fallback_post(prompt_type, signal)
     else:
         template = _load_prompt(prompt_type)
         prompt = template.replace("{input_block}", _build_input_block(prompt_type, signal))
         try:
-            raw = _call_openai(prompt)
+            raw = _call_gemini(prompt)
             post = json.loads(_strip_json_fences(raw))
         except Exception as exc:  # noqa: BLE001
-            print(f"[content_generator] OpenAI failed, falling back: {exc}")
+            print(f"[content_generator] Gemini failed, falling back: {exc}")
             post = _fallback_post(prompt_type, signal)
 
     # Normalize and stamp.

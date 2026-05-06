@@ -133,7 +133,8 @@ def render_hook_image(post: dict[str, Any], out_dir: str | None = None) -> str:
 
     change = post.get("source_signal", {}).get("change_24h")
     if change is not None:
-        arrow = "▲" if direction == "up" else ("▼" if direction == "down" else "•")
+        # Arrow tracks actual price change, not the post's stance.
+        arrow = "▲" if change > 0 else ("▼" if change < 0 else "•")
         ch_text = f"{arrow} {change:+.2f}%"
         ch_font = _font(48, bold=True)
         w = draw.textlength(ch_text, font=ch_font)

@@ -51,7 +51,7 @@ def _load_json(path: str, default: Any) -> Any:
 
 @app.route("/")
 def index() -> Any:
-    return render_template("index.html", has_openai=config.HAS_OPENAI)
+    return render_template("index.html", has_llm=config.HAS_LLM)
 
 
 @app.route("/api/trends", methods=["POST"])

@@ -12,7 +12,7 @@ import os
 import re
 from typing import Any
 
-from openai import OpenAI
+import google.generativeai as genai
 
 import config
 
@@ -70,27 +70,28 @@ def _fallback_reply(comment: str) -> dict[str, str]:
 
 def generate_reply(post_body: str, comment: str) -> dict[str, str]:
     """Generate a short reply to a comment on a Binance Square post."""
-    if not config.HAS_OPENAI:
+    if not config.HAS_LLM:
         return _fallback_reply(comment)
 
     prompt = (_load_prompt()
               .replace("{post_body}", post_body or "")
               .replace("{comment}", comment or ""))
     try:
-        client = OpenAI(api_key=config.OPENAI_API_KEY)
-        resp = client.chat.completions.create(
-            model=config.OPENAI_MODEL,
-            messages=[
-                {"role": "system",
-                 "content": "You output ONLY valid JSON. No markdown, no commentary."},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.7,
-            response_format={"type": "json_object"},
+        genai.configure(api_key=config.GEMINI_API_KEY)
+        model = genai.GenerativeModel(
+            config.GEMINI_MODEL,
+            system_instruction="You output ONLY valid JSON. No markdown, no commentary.",
         )
-        return json.loads(_strip_json_fences(resp.choices[0].message.content or ""))
+        resp = model.generate_content(
+            prompt,
+            generation_config={
+                "temperature": 0.7,
+                "response_mime_type": "application/json",
+            },
+        )
+        return json.loads(_strip_json_fences(resp.text or ""))
     except Exception as exc:  # noqa: BLE001
-        print(f"[engagement] OpenAI failed, falling back: {exc}")
+        print(f"[engagement] Gemini failed, falling back: {exc}")
         return _fallback_reply(comment)
 
 

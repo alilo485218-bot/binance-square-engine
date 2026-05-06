@@ -3,6 +3,9 @@
 Verifies that the most important modules import and produce sane output via the
 deterministic fallbacks. Run with `python -m pytest tests/` or
 `python tests/test_smoke.py`.
+
+We forcibly unset GEMINI_API_KEY before importing so these tests stay offline
+(no real API calls, no quota burn) regardless of the developer's environment.
 """
 from __future__ import annotations
 
@@ -10,7 +13,14 @@ import os
 import sys
 import unittest
 
+# Force offline mode BEFORE importing modules so HAS_LLM resolves to False.
+os.environ.pop("GEMINI_API_KEY", None)
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import config  # noqa: E402
+config.GEMINI_API_KEY = ""
+config.HAS_LLM = False
 
 from modules import content_generator, engagement_assistant, image_generator, smart_selector  # noqa: E402
 

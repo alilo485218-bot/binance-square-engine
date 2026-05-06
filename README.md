@@ -82,7 +82,7 @@ Every prompt **forces JSON output** with this schema:
 }
 ```
 
-If `OPENAI_API_KEY` is missing, falls back to deterministic templates so the rest of the pipeline still runs.
+If `GEMINI_API_KEY` is missing, falls back to deterministic templates so the rest of the pipeline still runs.
 
 ### 3.3 Smart Selector — `modules/smart_selector.py`
 Score (0–100):
@@ -155,7 +155,7 @@ The repo already implements days 1–4. Day 5 is operational tuning.
 | Day | Goal | What to ship |
 |---|---|---|
 | **D1** | Trend Engine + UI shell | Run `app.py`, click **Get Trends**, see CoinGecko trending + top movers + RSS news. ✅ shipped |
-| **D2** | Content Generator + 3 prompts | Click **Generate Posts**, see 4–6 ranked posts (works with or without OpenAI). ✅ shipped |
+| **D2** | Content Generator + 3 prompts | Click **Generate Posts**, see 4–6 ranked posts (works with or without Gemini). ✅ shipped |
 | **D3** | Smart Selector + Image Generator | Posts are ranked 0–100. Click **🎨 Generate Image** to render a hook image. ✅ shipped |
 | **D4** | Engagement + Scheduler | Reply tool inside each post card. UTC scheduler + first-hour reminder plan. ✅ shipped |
 | **D5** | Real-world calibration | Publish 6–10 posts. Tune `prompts/*.txt`, scoring weights in `smart_selector.py`, and `PRIME_POSTING_HOURS_UTC` in `config.py` based on which posts went viral. |
@@ -178,7 +178,7 @@ pip install -r requirements.txt
 
 # 2. Configure (optional but strongly recommended)
 cp .env.example .env
-# edit .env and set OPENAI_API_KEY
+# edit .env and set GEMINI_API_KEY (https://aistudio.google.com/app/apikey)
 
 # 3. Run
 python app.py
@@ -218,7 +218,7 @@ binance-square-engine/
 
 ## 8. Extending
 
-- **Swap LLM provider**: Edit `_call_openai()` in `content_generator.py` and `generate_reply()` in `engagement_assistant.py` — replace 5 lines, that's it.
+- **Swap LLM provider**: Edit `_call_gemini()` in `content_generator.py` and `generate_reply()` in `engagement_assistant.py` — replace 5 lines, that's it.
 - **Add a 4th prompt type** (e.g. "alpha" / "tutorial"): drop a new `prompts/<type>.txt`, add to `PROMPT_TYPES` in `content_generator.py`, and pick it up in `generate_batch`.
 - **Custom image style**: tweak the `COLORS` palette + `_shrink_to_fit` in `image_generator.py`.
 - **Auto-fetch trends every prime hour**: call `scheduler.install_daily_cron(callback)` from `app.py`.

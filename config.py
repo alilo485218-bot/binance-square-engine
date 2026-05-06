@@ -5,8 +5,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- API keys ---
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+# Google Gemini powers the Content Generator + Engagement Assistant.
+# Get a key at https://aistudio.google.com/app/apikey
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
 
 # --- Web server ---
 PORT = int(os.getenv("PORT", "5000"))
@@ -29,4 +31,4 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 PRIME_POSTING_HOURS_UTC = [13, 14, 15, 16, 19, 20]
 
 # --- Feature flags ---
-HAS_OPENAI = bool(OPENAI_API_KEY)
+HAS_LLM = bool(GEMINI_API_KEY)
