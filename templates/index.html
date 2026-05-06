@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Binance Square Content Engine</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Binance Square — Content Engine</h1>
+    <p class="sub">
+      Smart Posting Assistant · Top 10 (Write to Earn) ·
+      OpenAI: <span class="{% if has_openai %}ok{% else %}warn{% endif %}">
+        {% if has_openai %}connected{% else %}NOT connected (using fallback templates){% endif %}
+      </span>
+    </p>
+  </header>
+
+  <section class="bar">
+    <button id="btn-trends">1 · Get Trends</button>
+    <button id="btn-generate">2 · Generate Posts</button>
+    <button id="btn-windows">⏰ Prime UTC windows</button>
+  </section>
+
+  <section id="trends-block" class="block">
+    <h2>Trends</h2>
+    <div id="trends-empty" class="empty">No trends loaded yet. Click <b>Get Trends</b>.</div>
+    <div id="trends"></div>
+  </section>
+
+  <section id="posts-block" class="block">
+    <h2>Generated posts (ranked by score)</h2>
+    <div id="posts-empty" class="empty">No posts yet. Click <b>Generate Posts</b>.</div>
+    <div id="posts"></div>
+  </section>
+
+  <section id="windows-block" class="block hidden">
+    <h2>Prime UTC posting windows (remaining today)</h2>
+    <div id="windows"></div>
+  </section>
+
+  <template id="post-card-tpl">
+    <div class="post" data-id="">
+      <div class="post-head">
+        <span class="badge type"></span>
+        <span class="badge dir"></span>
+        <span class="score"></span>
+      </div>
+      <textarea class="body" rows="6"></textarea>
+      <div class="meta">
+        <span class="word-count"></span>
+        <span class="cashtag"></span>
+      </div>
+      <div class="actions">
+        <button class="btn-image">🎨 Generate Image</button>
+        <button class="btn-copy">📋 Copy text</button>
+        <button class="btn-schedule">⏰ Schedule reminder</button>
+        <button class="btn-reply-tool">💬 Reply tool</button>
+      </div>
+      <div class="image-slot"></div>
+      <div class="reply-slot hidden">
+        <textarea class="comment-in" rows="2" placeholder="Paste a comment from your post here..."></textarea>
+        <button class="btn-make-reply">Generate reply</button>
+        <pre class="reply-out"></pre>
+      </div>
+      <details class="score-detail">
+        <summary>Why this score?</summary>
+        <pre class="score-json"></pre>
+      </details>
+    </div>
+  </template>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

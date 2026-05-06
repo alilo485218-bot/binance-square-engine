@@ -1,0 +1,147 @@
+"""Flask web UI — the single page where you run the daily workflow.
+
+Endpoints:
+  GET  /                       Main UI.
+  POST /api/trends             Fetch fresh trend snapshot.
+  POST /api/generate           Generate a batch of posts from latest trends.
+  POST /api/select              Rank + return best posts.
+  POST /api/image               Render a hook image for a post.
+  POST /api/reply               Generate a reply to a comment.
+  POST /api/schedule            Queue a publish reminder.
+  GET  /api/pending             List pending reminders.
+  GET  /api/prime-windows       Return today's remaining UTC posting windows.
+  GET  /output/<filename>       Serve generated images.
+"""
+from __future__ import annotations
+
+import datetime as dt
+import json
+import os
+from typing import Any
+
+from flask import Flask, jsonify, render_template, request, send_from_directory
+
+import config
+from modules import (
+    content_generator,
+    engagement_assistant,
+    image_generator,
+    scheduler,
+    smart_selector,
+    trend_engine,
+)
+
+app = Flask(__name__, template_folder="templates", static_folder="static")
+
+_SNAPSHOT_PATH = os.path.join(config.DATA_DIR, "snapshot.json")
+_POSTS_PATH = os.path.join(config.DATA_DIR, "posts.json")
+
+
+def _save_json(path: str, data: Any) -> None:
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=2, ensure_ascii=False)
+
+
+def _load_json(path: str, default: Any) -> Any:
+    if not os.path.exists(path):
+        return default
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+@app.route("/")
+def index() -> Any:
+    return render_template("index.html", has_openai=config.HAS_OPENAI)
+
+
+@app.route("/api/trends", methods=["POST"])
+def api_trends() -> Any:
+    snapshot = trend_engine.get_full_snapshot()
+    _save_json(_SNAPSHOT_PATH, snapshot)
+    return jsonify(snapshot)
+
+
+@app.route("/api/generate", methods=["POST"])
+def api_generate() -> Any:
+    body = request.get_json(silent=True) or {}
+    n_per_type = int(body.get("n_per_type", 2))
+    snapshot = _load_json(_SNAPSHOT_PATH, None)
+    if not snapshot:
+        snapshot = trend_engine.get_full_snapshot()
+        _save_json(_SNAPSHOT_PATH, snapshot)
+
+    posts = content_generator.generate_batch(snapshot, n_per_type=n_per_type)
+    ranked = smart_selector.rank_posts(posts, snapshot=snapshot)
+    _save_json(_POSTS_PATH, ranked)
+    return jsonify({"posts": ranked, "snapshot_at": snapshot.get("fetched_at")})
+
+
+@app.route("/api/select", methods=["POST"])
+def api_select() -> Any:
+    posts = _load_json(_POSTS_PATH, [])
+    snapshot = _load_json(_SNAPSHOT_PATH, None)
+    ranked = smart_selector.rank_posts(posts, snapshot=snapshot)
+    _save_json(_POSTS_PATH, ranked)
+    return jsonify({"posts": ranked})
+
+
+@app.route("/api/image", methods=["POST"])
+def api_image() -> Any:
+    post = (request.get_json(silent=True) or {}).get("post")
+    if not post:
+        return jsonify({"error": "missing 'post' in body"}), 400
+    path = image_generator.render_hook_image(post)
+    fname = os.path.basename(path)
+    return jsonify({"path": path, "url": f"/output/{fname}"})
+
+
+@app.route("/api/reply", methods=["POST"])
+def api_reply() -> Any:
+    body = request.get_json(silent=True) or {}
+    post_body = body.get("post_body", "")
+    comment = body.get("comment", "")
+    if not comment:
+        return jsonify({"error": "missing 'comment'"}), 400
+    return jsonify(engagement_assistant.generate_reply(post_body, comment))
+
+
+@app.route("/api/schedule", methods=["POST"])
+def api_schedule() -> Any:
+    body = request.get_json(silent=True) or {}
+    post_id = body.get("post_id")
+    fire_at_utc = body.get("fire_at_utc")
+    if not post_id or not fire_at_utc:
+        return jsonify({"error": "post_id and fire_at_utc required"}), 400
+    item = scheduler.schedule_post_reminder(
+        post_id=post_id, fire_at_utc=fire_at_utc,
+        label=body.get("label", "Time to publish"),
+    )
+    return jsonify(item)
+
+
+@app.route("/api/pending", methods=["GET"])
+def api_pending() -> Any:
+    return jsonify({"pending": scheduler.list_pending()})
+
+
+@app.route("/api/prime-windows", methods=["GET"])
+def api_prime_windows() -> Any:
+    return jsonify({
+        "now_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "windows": scheduler.prime_windows_today(),
+        "all_hours_utc": config.PRIME_POSTING_HOURS_UTC,
+    })
+
+
+@app.route("/api/reminder-plan/<post_id>", methods=["GET"])
+def api_reminder_plan(post_id: str) -> Any:
+    return jsonify({"plan": engagement_assistant.reminder_plan(post_id)})
+
+
+@app.route("/output/<path:filename>", methods=["GET"])
+def serve_output(filename: str) -> Any:
+    return send_from_directory(config.OUTPUT_DIR, filename)
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=config.PORT, debug=True)
