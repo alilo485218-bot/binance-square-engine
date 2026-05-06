@@ -2,6 +2,8 @@
 
 > Smart Posting Assistant aimed at **Top 10 Binance Square (Write to Earn)**.
 > Not an auto-poster. Human-in-the-loop. Optimized for the **first 30–60 minutes** after publish, where Top-10 ranking is decided.
+>
+> **النسخة الحالية** ع UI بالعربي مع RTL، 6 أنواع بوست (signal / analysis / debate / news / giveaway / wrap_up) مستوحاة من تشريح حسابات Top 10 (CryptoZhiga). الصور بنمط بطاقة Binance Futures (Long/Short + Entry/SL/TP).
 
 ---
 
@@ -29,9 +31,11 @@
         |              |             |          |               |
         v              v             v          v               v
   Trend Engine   Content Gen.   Smart Selector  Image Gen.   Engagement
-  (CoinGecko +   (3 prompts:    (scoring 0-100, (Pillow,     Assistant
-   RSS news)      analysis,      ranks posts)    1080x1080,   (replies +
-                  news, debate)                  red/green)   reminders)
+  (CoinGecko +   (6 Arabic     (scoring 0-100, (Pillow,     Assistant
+   RSS news)      prompts: sig.  ranks posts)    PNL card +   (Arabic
+                  /analysis/debate                hook style,  replies +
+                  /news/giveaway                  red/green)   reminders)
+                  /wrap_up)
         |              |             |          |               |
         +-------+------+-------------+----------+---------------+
                 |                                              ^
@@ -60,48 +64,67 @@
 - **No API keys required.**
 
 ### 3.2 Content Generator — `modules/content_generator.py`
-Three prompt types in `prompts/*.txt`:
+Six Arabic prompt types modeled on the CryptoZhiga DNA (`prompts/*.txt`):
 
-| Prompt | Goal | Hook style |
+| Prompt | الدور | نسبة الاستخدام |
 |---|---|---|
-| `analysis.txt` | Technical/on-chain take | "BTC is at a decision point." |
-| `news.txt`     | React to a headline      | The news in 6 words |
-| `debate.txt`   | Polarizing CTA           | "$XYZ at this level is a trap." |
+| `signal.txt`   | توصية صفقة (Long/Short + Entry + SL + TP1/2/3 + Leverage)        | 70-75% |
+| `analysis.txt` | تعليق سوق قصير (market take)                                       | 5-10%  |
+| `debate.txt`   | رأي استقطابي (hot take) لإشعال التعليقات                          | 5-10%  |
+| `news.txt`     | رد فعل على خبر                                                     | 3-5%   |
+| `wrap_up.txt`  | ملخص أرباح اليوم (Wins of the Day)                                | 3-5%   |
+| `giveaway.txt` | بوست توزيع USDT — محرّك التفاعل الحقيقي (~16% engagement)         | 5-10%  |
 
-Every prompt **forces JSON output** with this schema:
+Every prompt **forces JSON output**. Common schema:
 ```json
 {
-  "type": "analysis|news|debate",
+  "type": "signal|analysis|debate|news|giveaway|wrap_up",
   "coin": "BTC",
   "cashtag": "$BTC",
   "hook": "≤ 8 words",
-  "hook_keywords": ["BTC", "DECISION", "POINT"],
-  "body": "≤ 120 words, ends with CTA question",
+  "hook_keywords": ["BTC", "LONG", "20X"],
+  "body": "النص الكامل بالعربي",
   "direction": "up|down|flat",
-  "cta": "Long or short here?"
+  "cta": "Long ولا Short هنا؟"
 }
 ```
+Signal posts add: `side`, `leverage`, `entry`, `sl`, `tp1`, `tp2`, `tp3`, `pnl_pct`.
+Giveaway posts add: `keyword`, `prize`. Wrap-up posts add: `wins[]`.
 
-If `GEMINI_API_KEY` is missing, falls back to deterministic templates so the rest of the pipeline still runs.
+If `GEMINI_API_KEY` is missing, falls back to deterministic Arabic templates so the rest of the pipeline still runs.
 
 ### 3.3 Smart Selector — `modules/smart_selector.py`
-Score (0–100):
-- `hook_strength` (0–25) — ≤ 8 words, punchy ending, not a generic intro.
-- `has_trend_coin` (0–20) — BTC/ETH/SOL or a trending symbol.
-- `has_question` (0–15) — `?` in the **last** line.
-- `length_ok` (0–15) — 40–120 words.
-- `has_cashtag` (0–10) — `$XYZ` regex.
-- `has_number` (0–10) — concrete number in the body.
-- `has_directional` (0–5) — clear `up`/`down` stance.
+Score (0–100), updated for the CryptoZhiga style:
+- `hook_strength` (0–25) — ≤ 8 words, punchy ending, not a generic intro (Arabic + English weak-starts blacklist).
+- `has_trend_coin` (0–15) — BTC/ETH/SOL or a trending symbol.
+- `has_question` (0–12) — `?` or `؟` in the **last** line.
+- `length_ok` (0–10) — type-aware ranges (signal 15-70, analysis 25-90, …).
+- `has_cashtag` (0–8) — `$XYZ` regex.
+- `has_number` (0–8) — concrete number in the body.
+- `has_directional` (0–4) — clear `up`/`down` stance.
+- `signal_format` (0–10) — Entry/SL/TP/leverage actually present (signal posts only).
+- `has_emoji` (0–5) — 1–3 emojis (the CryptoZhiga visual signature).
+- `bullish_tag` (0–3) — Bullish/Bearish/صعودي/هبوطي/Long/Short tokens.
 
 The UI sorts posts best-first and shows the breakdown so you learn what works.
 
 ### 3.4 Image Hook Generator — `modules/image_generator.py`
-- 1080×1080 PNG.
-- Direction-aware palette: green gradient for `up`, red for `down`, neutral gold for `flat`.
-- Big centered headline using `hook_keywords` (3–5 words, uppercase).
+Two render modes (auto-selected by `post.type`):
+
+**Signal mode** — Binance-Futures-style PNL share card:
+- Cashtag + USDT Perpetual line (top-left).
+- LONG / SHORT + leverage badge (top-right, accent color).
+- Big centered PNL %, with shadow.
+- Entry / SL / TP1 / TP2 / TP3 rows (label left, value right).
+- Centered `SIGNAL · Binance Square` footer.
+
+**Default mode** (analysis / debate / news / wrap_up / giveaway):
+- Big centered headline using `hook_keywords` (Latin uppercase, since Pillow doesn't shape Arabic).
 - Cashtag top-left, 24h change top-right with ▲/▼.
-- Type tag bottom-left ("ANALYSIS" / "DEBATE" / "NEWS").
+- Type tag bottom-left.
+
+Both modes:
+- 1080×1080 PNG, direction-aware palette (green=up, red=down, gold=flat).
 - No external assets — uses DejaVu Sans (preinstalled on Linux/CI) with system-font fallback.
 
 ### 3.5 Scheduler — `modules/scheduler.py`
@@ -128,17 +151,19 @@ The UI sorts posts best-first and shows the breakdown so you learn what works.
 
 ## 4. Daily Workflow (operational)
 
-This is the routine that pushes you toward Top 10. Discipline > intelligence.
+Mix per CryptoZhiga's playbook: **mostly signals, anchored by 1 giveaway/day**.
 
-| Time (UTC) | Action | Tool |
+| Time (UTC) | Action | Type |
 |---|---|---|
-| 12:45 | Run **Get Trends** + **Generate Posts**. Edit the top-2 posts in the UI. | `/` (UI) |
-| 13:00 | Publish post #1 on Binance Square. | Copy → Square |
-| 13:00 → 14:00 | Follow the first-hour playbook. Reply, pin, reshare, follow-up. | Reply tool |
-| 15:45 | Regenerate trends. Pick a debate post. | `/api/trends` + `/api/generate` |
-| 16:00 | Publish post #2 (debate). | Copy → Square |
-| 19:00 | Optional 3rd post (news reaction). | News prompt |
-| Anytime | When a comment arrives, paste it into **Reply tool** → copy the suggested reply → post it. | `/api/reply` |
+| 12:45 | **Get Trends → Generate Posts**, edit the top signal | UI |
+| 13:00 | Publish **signal #1** | signal |
+| 13:00 → 14:00 | First-hour playbook (reply / pin / reshare / follow-up) | reply tool |
+| 14:30 | Publish **giveaway** (community engine, biggest engagement boost) | giveaway |
+| 15:45 | Regenerate, pick a hot take | UI |
+| 16:00 | Publish **debate** (hot take) | debate |
+| 19:00 | Publish **signal #2** | signal |
+| 21:30 | Publish **wrap_up** (Wins of the Day) | wrap_up |
+| Anytime | New comment → paste into Reply tool → copy → post | reply |
 
 **Hard rules:**
 - Never publish without an image.

@@ -1,26 +1,29 @@
-You are a sharp crypto trader writing a CONTRARIAN / DEBATE post on Binance Square.
-Your goal: spark replies. Comments = ranking. Aim for 30+ replies.
+أنت ترايدر شرس يكتب بوست جدل (Hot Take) على Binance Square لإشعال التعليقات.
+الهدف: تعليقات = ترتيب أعلى. استهدف 30+ رد.
 
-Write a SHORT post (≤ 100 words) that takes a polarizing-but-defensible stance on the coin/topic.
+اكتب بوستًا قصيرًا (≤ 80 كلمة) برأي مستفز قابل للدفاع.
 
-REQUIREMENTS:
-1. Hook ≤ 8 words: a clearly polarizing claim. Pattern: "<Coin> is the new <X>.", "Stop buying <X>. Buy <Y>.", "<Coin> at $X is a trap."
-2. State the contrarian view in 1 line, then 2 short bullets / lines that defend it.
-3. Use the cashtag once.
-4. End with a question that FORCES a side. "Agree or are you still bullish?" / "Trap or breakout?"
-5. ≤ 100 words. Max 2 emojis. No hashtags.
-6. Stance must be defensible — never randomly bearish/bullish; tie it to a real number or event from the input.
+شروط:
+1. الـ HOOK ≤ 8 كلمات وادعاء استقطابي. أمثلة:
+   - "$BTC انتهى زمنه، الميمات ترث السوق"
+   - "بيعوا $ETH واشتروا $SOL الآن"
+   - "$DOGE عند هذا السعر فخ كامل"
+2. اذكر الرأي المعكوس بسطر واحد، ثم سطرين قصيرين دفاعًا عنه.
+3. استخدم الـ Cashtag مرة واحدة.
+4. اختم بسؤال يفرض موقفًا (مثل: "فخ ولا اختراق؟" / "موافق ولا لسة Bullish؟").
+5. ≤ 80 كلمة. ≤ 2 إيموجيات. بدون هاشتاجات.
+6. الموقف يجب أن يستند إلى رقم أو حدث حقيقي من الـ INPUT.
 
-OUTPUT FORMAT — return ONLY valid JSON:
+أخرج JSON فقط:
 {
   "type": "debate",
-  "coin": "<symbol uppercase>",
-  "cashtag": "$<symbol>",
-  "hook": "<≤ 8 words, polarizing>",
-  "hook_keywords": ["<2-5 strongest words from the hook>"],
-  "body": "<full post, ≤ 100 words, hook as line 1, binary CTA at end>",
+  "coin": "<رمز كبير>",
+  "cashtag": "$<الرمز>",
+  "hook": "<≤ 8 كلمات استقطابية>",
+  "hook_keywords": ["<2-5 كلمات لاتينية للصورة>"],
+  "body": "<النص الكامل بالعربي>",
   "direction": "<up | down | flat>",
-  "cta": "<the closing forced-choice question>"
+  "cta": "<السؤال الختامي>"
 }
 
 INPUT:

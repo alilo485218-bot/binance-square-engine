@@ -1,9 +1,8 @@
-"""Engagement Assistant — what to do in the first hour after publishing.
+"""Engagement Assistant — ماذا تفعل في أول ساعة بعد النشر (سر التوب 10).
 
-Two responsibilities:
-  1. Generate human-sounding replies to incoming comments (LLM, with fallback).
-  2. Produce a checklist of timed reminders for the first 60 minutes
-     (this is the secret to climbing into the Top 10).
+مسؤوليتان:
+  1. توليد ردود إنسانية على التعليقات (Gemini مع fallback).
+  2. خطة تذكيرات بأول 60 دقيقة بعد النشر — هذه هي المفتاح للوصول إلى Top 10.
 """
 from __future__ import annotations
 
@@ -16,23 +15,25 @@ import google.generativeai as genai
 
 import config
 
+# قائمة تذكيرات أول ساعة (بالعربي مباشرة لاستخدامها في الواجهة).
 REMINDER_PLAN = [
-    (5,  "Reply to the first 3 comments. Aim < 10 minutes — first replies set the tone."),
-    (15, "Pin your strongest reply at the top of the thread."),
-    (20, "Quote-reply someone with a real number/level. Adds credibility."),
-    (30, "Reshare in your community group / DM 3 friends asking for an honest take."),
-    (45, "Post a follow-up comment with an UPDATE or NEW DATA point — keeps thread alive."),
-    (60, "Final sweep: reply to ALL questions, even one-word ones."),
+    (5,  "ردّ على أول 3 تعليقات. الهدف < 10 دقائق — أول الردود تحدد إيقاع الخيط."),
+    (15, "ثبّت أقوى رد عندك في أعلى الخيط (Pin)."),
+    (20, "اعمل Quote-reply لأحدهم بمستوى رقمي حقيقي. يضيف مصداقية."),
+    (30, "شارك البوست في مجموعتك أو DM لـ 3 أصدقاء يطلب رأيهم الصريح."),
+    (45, "انشر تعليق متابعة فيه UPDATE أو رقم جديد — لإبقاء الخيط حيًا."),
+    (60, "كنس نهائي: ردّ على كل سؤال حتى الكلمة الواحدة."),
 ]
 
 QUESTION_BOOSTERS = [
-    "Are you long or short here?",
-    "Trap or breakout?",
-    "What's your invalidation level?",
-    "Buying or waiting?",
-    "Bullish or bearish on this news?",
-    "Which coin replaces it?",
-    "Is this priced in already?",
+    "أنت في Long ولا Short هنا؟",
+    "فخ ولا اختراق؟",
+    "ما مستوى الإبطال (invalidation) عندك؟",
+    "تشتري أو تنتظر؟",
+    "هل ستشارك في الموجة؟",
+    "صعودي ولا هبوطي على هذا الخبر؟",
+    "أي عملة تأخذ مكانه؟",
+    "هل السعر مسبقًا مسعّر بالخبر؟",
 ]
 
 
@@ -52,19 +53,28 @@ def _strip_json_fences(text: str) -> str:
 def _fallback_reply(comment: str) -> dict[str, str]:
     is_arabic = bool(re.search(r"[\u0600-\u06FF]", comment))
     if is_arabic:
-        reply = "وجهة نظر منطقية. ما هو مستوى الإبطال عندك؟"
-        tone = "neutral"
-    else:
-        c = comment.lower()
-        if any(w in c for w in ["scam", "trash", "wrong", "no way", "lol"]):
-            reply = "Fair pushback. What level invalidates the setup for you?"
+        c = comment
+        if any(w in c for w in ["نصب", "هراء", "خطأ", "غلط", "كذب", "مستحيل"]):
+            reply = "ملاحظة جيدة. ما المستوى الذي يبطل الإعداد عندك؟"
             tone = "disagree"
-        elif "?" in comment:
-            reply = "Good question. Watching the next 4h candle close. You taking a side?"
+        elif "؟" in c or "?" in c:
+            reply = "سؤال ممتاز. أراقب إغلاق شمعة 4 ساعات. ما رأيك؟"
             tone = "curious"
         else:
-            reply = "Solid take. Where's your invalidation? Mine's nearby."
+            reply = "وجهة نظر منطقية. أين الإبطال عندك؟ عندي قريب."
             tone = "neutral"
+        return {"reply": reply, "tone": tone}
+
+    c = comment.lower()
+    if any(w in c for w in ["scam", "trash", "wrong", "no way", "lol"]):
+        reply = "Fair pushback. What level invalidates the setup for you?"
+        tone = "disagree"
+    elif "?" in comment:
+        reply = "Good question. Watching the next 4h candle close. You taking a side?"
+        tone = "curious"
+    else:
+        reply = "Solid take. Where's your invalidation? Mine's nearby."
+        tone = "neutral"
     return {"reply": reply, "tone": tone}
 
 
@@ -80,7 +90,10 @@ def generate_reply(post_body: str, comment: str) -> dict[str, str]:
         genai.configure(api_key=config.GEMINI_API_KEY)
         model = genai.GenerativeModel(
             config.GEMINI_MODEL,
-            system_instruction="You output ONLY valid JSON. No markdown, no commentary.",
+            system_instruction=(
+                "You output ONLY valid JSON. No markdown, no commentary. "
+                "Arabic content inside JSON string values is welcome."
+            ),
         )
         resp = model.generate_content(
             prompt,
@@ -96,7 +109,7 @@ def generate_reply(post_body: str, comment: str) -> dict[str, str]:
 
 
 def reminder_plan(post_id: str, published_at_utc: int | None = None) -> list[dict[str, Any]]:
-    """Return the post-publish reminder checklist with relative timings."""
+    """خطة التذكيرات بعد النشر — قائمة 6 مهام بعد +5/+15/+20/+30/+45/+60 دقيقة."""
     return [
         {
             "post_id": post_id,
@@ -110,7 +123,7 @@ def reminder_plan(post_id: str, published_at_utc: int | None = None) -> list[dic
 
 
 def suggest_thread_questions(post: dict[str, Any], n: int = 3) -> list[str]:
-    """Pick `n` follow-up questions the user can drop in the thread to revive it."""
+    """اقتراح أسئلة لإحياء الخيط بعد النشر."""
     coin = (post.get("coin") or "BTC").upper()
-    pool = [q.replace("this", f"${coin}") for q in QUESTION_BOOSTERS]
+    pool = [q.replace("هنا", f"على ${coin}") for q in QUESTION_BOOSTERS]
     return pool[:n]
