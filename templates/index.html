@@ -16,6 +16,9 @@
       مساعد نشر ذكي · للوصول إلى Top 10 (Write to Earn) · مبني على استراتيجية CryptoZhiga ·
       Gemini: <span class="{% if has_llm %}ok{% else %}warn{% endif %}">
         {% if has_llm %}متصل{% else %}غير متصل (يستخدم القوالب البديلة){% endif %}
+      </span> ·
+      نشر تلقائي: <span class="{% if has_square_api %}ok{% else %}warn{% endif %}">
+        {% if has_square_api %}مفعّل{% else %}غير مفعّل (Dry-Run){% endif %}
       </span>
     </p>
   </header>
@@ -66,7 +69,10 @@
         <button class="btn-copy">📋 نسخ النص</button>
         <button class="btn-schedule">⏰ تذكير نشر</button>
         <button class="btn-reply-tool">💬 أداة الرد</button>
+        <button class="btn-publish-dry" title="نشر تجريبي (لا يُرسل إلى Binance)">🧪 تجربة نشر</button>
+        <button class="btn-publish-live" title="نشر فعلي عبر Binance Square OpenAPI">🚀 نشر الآن</button>
       </div>
+      <div class="publish-result hidden"></div>
       <div class="image-slot"></div>
       <div class="reply-slot hidden">
         <textarea class="comment-in" rows="2" dir="auto"

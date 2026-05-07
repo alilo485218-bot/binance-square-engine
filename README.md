@@ -204,6 +204,7 @@ pip install -r requirements.txt
 # 2. Configure (optional but strongly recommended)
 cp .env.example .env
 # edit .env and set GEMINI_API_KEY (https://aistudio.google.com/app/apikey)
+# (optional, لتفعيل النشر التلقائي) X_SQUARE_OPENAPI_KEY=your-binance-square-key
 
 # 3. Run
 python app.py
@@ -211,6 +212,59 @@ python app.py
 ```
 
 Then: **Get Trends → Generate Posts → edit → 🎨 Generate Image → 📋 Copy text → publish on Binance Square → run the first-hour playbook.**
+
+---
+
+## 6.5 Auto-Publish عبر Binance Square OpenAPI
+
+النظام الآن يدعم النشر التلقائي عبر الـ API الرسمي لـ Binance Square — مع تأخير عشوائي بين كل بوست (5-30 دقيقة) وحد أقصى يومي وقابلية الـ retry على أخطاء الشبكة فقط.
+
+**القيود (مهم):**
+- الـ API يدعم نصًا فقط. الصور لا تُرفع تلقائيًا — تُسجَّل في log كتذكير لرفعها يدويًا.
+- الـ default mode هو `dry-run` (لا يرسل شيء فعليًا) لحماية الحساب.
+- إذا حدث خطأ نهائي (KYC، كلمات حساسة، حظر حساب) يتوقف الطابور تلقائيًا.
+- الحد اليومي الافتراضي 12 بوست (قابل للتعديل).
+
+**استخدام CLI:**
+
+```bash
+# 1) أنشئ ملف queue
+cp data/posts.queue.example.json data/posts.queue.json
+# عدّل المحتوى حسب احتياجك
+
+# 2) جرّب dry-run (لا يرسل شيء)
+python auto_publish.py data/posts.queue.json
+
+# 3) للنشر الفعلي
+export X_SQUARE_OPENAPI_KEY='your-key-here'
+python auto_publish.py data/posts.queue.json --live
+
+# 4) خيارات
+python auto_publish.py data/posts.queue.json --live --min 5 --max 30 --cap 12
+python auto_publish.py data/posts.queue.json --live --no-shuffle
+```
+
+**استخدام من الواجهة (UI):**
+زر `🧪 تجربة نشر` على كل بوست = dry-run سريع.
+زر `🚀 نشر الآن` = نشر فعلي (يطلب تأكيدًا قبل الإرسال).
+
+**Endpoints:**
+- `GET  /api/publish/status` — حالة المفتاح + الحد اليومي + كم نُشر اليوم.
+- `POST /api/publish/single` — `{text, hashtags?, dry_run?}` ينشر بوست واحد.
+- `POST /api/publish/queue/preview` — `{posts, shuffle?, min_delay_min?, max_delay_min?}` يحاكي الطابور بدون انتظار.
+
+**Endpoint رسمي مستخدَم:**
+```
+POST https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add
+Headers:
+  X-Square-OpenAPI-Key: <key>
+  Content-Type: application/json
+  clienttype: binanceSkill
+Body:
+  {"bodyTextOnly": "<text + hashtags>"}
+```
+
+الـ log في `data/publish_log.jsonl` (سطر JSON لكل محاولة، نجاحًا أو فشلًا).
 
 ---
 
@@ -222,13 +276,15 @@ binance-square-engine/
 ├── config.py                   # Env vars, paths, prime UTC hours
 ├── requirements.txt
 ├── .env.example
+├── auto_publish.py             # CLI: قائمة JSON → نشر تلقائي مع تأخير عشوائي
 ├── modules/
 │   ├── trend_engine.py
 │   ├── content_generator.py
 │   ├── smart_selector.py
 │   ├── image_generator.py
 │   ├── scheduler.py
-│   └── engagement_assistant.py
+│   ├── engagement_assistant.py
+│   └── binance_publisher.py    # OpenAPI client + retry + queue logic
 ├── prompts/
 │   ├── analysis.txt
 │   ├── news.txt
@@ -252,10 +308,11 @@ binance-square-engine/
 
 ## 9. What this tool does NOT do (by design)
 
-- ❌ Auto-post to Binance Square (no public API; against TOS).
+- ❌ Auto-upload images via API (Binance Square OpenAPI is text-only — صور تُرفع يدويًا).
+- ❌ Survivorship-bias (نشر الصفقات الرابحة فقط) — يخالف ToS ويحرق الحساب.
 - ❌ Buy/sell crypto.
-- ❌ Run unattended overnight content farms.
 - ❌ Replace your judgment — your edit step matters most.
+- ⚠️ Auto-publish موجود لكنه dry-run افتراضيًا — لازم تفعّله صراحة.
 
 ---
 

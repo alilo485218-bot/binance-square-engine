@@ -173,3 +173,29 @@ ol.plan li {
   margin: 6px 0;
 }
 ol.plan li b { color: #f0b90b; }
+
+.publish-result { margin-top: 10px; font-size: 13px; }
+.publish-result .ok {
+  background: #0e2b1f;
+  border: 1px solid #1f5d3f;
+  color: #5be3a4;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+.publish-result .ok a { color: #5be3a4; text-decoration: underline; word-break: break-all; }
+.publish-result .warn {
+  background: #2c1d0e;
+  border: 1px solid #5d3f1a;
+  color: #ffb74e;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+.btn-publish-live {
+  background: #0ecb81 !important;
+  color: #0b0e13 !important;
+}
+.btn-publish-live:hover { filter: brightness(1.1); }
+.btn-publish-dry {
+  background: #2a3340 !important;
+  color: #e6e8ef !important;
+}

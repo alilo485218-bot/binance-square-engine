@@ -23,6 +23,7 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 
 import config
 from modules import (
+    binance_publisher,
     content_generator,
     engagement_assistant,
     image_generator,
@@ -51,7 +52,11 @@ def _load_json(path: str, default: Any) -> Any:
 
 @app.route("/")
 def index() -> Any:
-    return render_template("index.html", has_llm=config.HAS_LLM)
+    return render_template(
+        "index.html",
+        has_llm=config.HAS_LLM,
+        has_square_api=config.HAS_SQUARE_API,
+    )
 
 
 @app.route("/api/trends", methods=["POST"])
@@ -136,6 +141,64 @@ def api_prime_windows() -> Any:
 @app.route("/api/reminder-plan/<post_id>", methods=["GET"])
 def api_reminder_plan(post_id: str) -> Any:
     return jsonify({"plan": engagement_assistant.reminder_plan(post_id)})
+
+
+@app.route("/api/publish/single", methods=["POST"])
+def api_publish_single() -> Any:
+    """Publish ONE post immediately. Body: {text, hashtags?, dry_run?}."""
+    body = request.get_json(silent=True) or {}
+    text = (body.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "text is required"}), 400
+    hashtags = list(body.get("hashtags") or [])
+    dry_run = bool(body.get("dry_run", config.PUBLISH_DRY_RUN_DEFAULT))
+    post = binance_publisher.QueuedPost(text=text, hashtags=hashtags)
+    publisher = binance_publisher.SquarePublisher()
+    result = publisher.publish_text(post.render_body(), dry_run=dry_run)
+    return jsonify({
+        "success": result.success,
+        "dry_run": result.dry_run,
+        "code": result.code,
+        "message": result.message,
+        "post_id": result.post_id,
+        "post_url": result.post_url,
+        "error": result.error,
+        "attempts": result.attempts,
+    })
+
+
+@app.route("/api/publish/queue/preview", methods=["POST"])
+def api_publish_queue_preview() -> Any:
+    """Preview a queue without sleeping (always dry-run, max delay 0). Useful for the UI."""
+    body = request.get_json(silent=True) or {}
+    posts = body.get("posts") or []
+    if not isinstance(posts, list) or not posts:
+        return jsonify({"error": "posts must be a non-empty list"}), 400
+    events: list[dict[str, Any]] = []
+    binance_publisher.publish_queue(
+        posts,
+        dry_run=True, shuffle=bool(body.get("shuffle", True)),
+        min_delay_min=int(body.get("min_delay_min", 5)),
+        max_delay_min=int(body.get("max_delay_min", 30)),
+        sleep_fn=lambda s: None,
+        on_event=lambda stage, payload: events.append({"stage": stage, **payload}),
+    )
+    return jsonify({"events": events})
+
+
+@app.route("/api/publish/status", methods=["GET"])
+def api_publish_status() -> Any:
+    pub = binance_publisher.SquarePublisher()
+    return jsonify({
+        "has_api_key": bool(pub.api_key),
+        "masked_key": pub.masked_key(),
+        "endpoint": pub.api_url,
+        "dry_run_default": config.PUBLISH_DRY_RUN_DEFAULT,
+        "min_delay_min": config.PUBLISH_MIN_DELAY_MIN,
+        "max_delay_min": config.PUBLISH_MAX_DELAY_MIN,
+        "daily_cap": config.PUBLISH_DAILY_CAP,
+        "posted_today": binance_publisher.count_published_today(),
+    })
 
 
 @app.route("/output/<path:filename>", methods=["GET"])

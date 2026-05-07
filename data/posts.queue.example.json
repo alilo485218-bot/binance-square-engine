@@ -1,0 +1,20 @@
+[
+  {
+    "text": "$BTC يخترق 73K الآن 🔥\nنحن في موجة صعودية واضحة.\nLong عند 73,200 — SL 71,800 — TP1 74,500 · TP2 76,000 · TP3 78,000\nمن معي؟",
+    "image_path": "output/sample_signal.png",
+    "hashtags": ["BTC", "Bitcoin", "TradingSignals"],
+    "id": "demo-1"
+  },
+  {
+    "text": "$ETH عند نقطة قرار 🚀\nالـ 2400 لازم يثبت — وإلا ينهار للـ 2200.\nأنا Long بحذر، رافعة 10x.\nأنت معي ولا ضدي؟",
+    "image_path": "output/sample_eth.png",
+    "hashtags": ["ETH", "Ethereum", "Crypto"],
+    "id": "demo-2"
+  },
+  {
+    "text": "ملخص اليوم 📊\n+87% على $BTC رافعة 20x ✅\n+34% على $SOL رافعة 10x ✅\n+12% على $TON رافعة 5x ✅\nالسوق ما ينام، ولا نحن 😎\nغدًا: $ZEC و $NEAR في الـ watchlist 🎯",
+    "image_path": null,
+    "hashtags": ["WrapUp", "DailyWins"],
+    "id": "demo-3"
+  }
+]

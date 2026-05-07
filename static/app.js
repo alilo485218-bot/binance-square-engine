@@ -134,6 +134,39 @@ function renderPosts(posts) {
       card.querySelector(".reply-slot").classList.toggle("hidden");
     });
 
+    const publishHandler = (live) => async (e) => {
+      const b = e.target;
+      const orig = b.textContent;
+      const text = card.querySelector(".body").value;
+      if (!text.trim()) { alert("النص فارغ."); return; }
+      const hashtags = (post.cashtag ? [post.cashtag] : []).map(t => t.replace(/^\$/, ""));
+      if (live && !confirm("سيتم نشر البوست فعليًا على حسابك في Binance Square. متأكد؟")) return;
+      b.disabled = true; b.textContent = live ? "جاري النشر..." : "جاري التجربة...";
+      try {
+        const r = await api("/api/publish/single", { text, hashtags, dry_run: !live });
+        const slot = card.querySelector(".publish-result");
+        slot.classList.remove("hidden");
+        if (r.success) {
+          if (r.dry_run) {
+            slot.innerHTML = `<div class="ok">✓ تجربة ناجحة (لم يُرسل فعليًا) — ${text.length} حرف</div>`;
+          } else {
+            const link = r.post_url
+              ? `<a href="${r.post_url}" target="_blank" rel="noopener">${r.post_url}</a>`
+              : "(تم النشر، لكن الـ URL غير متوفر)";
+            slot.innerHTML = `<div class="ok">✓ نُشر بنجاح — ${link}</div>`;
+          }
+        } else {
+          slot.innerHTML = `<div class="warn">✗ فشل النشر — code=${r.code || "?"} · ${r.error || r.message || ""}</div>`;
+        }
+      } catch (err) {
+        alert("فشل النشر: " + err.message);
+      } finally {
+        b.disabled = false; b.textContent = orig;
+      }
+    };
+    card.querySelector(".btn-publish-dry").addEventListener("click", publishHandler(false));
+    card.querySelector(".btn-publish-live").addEventListener("click", publishHandler(true));
+
     card.querySelector(".btn-make-reply").addEventListener("click", async () => {
       const comment = card.querySelector(".comment-in").value;
       if (!comment) return;

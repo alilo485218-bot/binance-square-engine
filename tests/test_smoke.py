@@ -22,7 +22,13 @@ import config  # noqa: E402
 config.GEMINI_API_KEY = ""
 config.HAS_LLM = False
 
-from modules import content_generator, engagement_assistant, image_generator, smart_selector  # noqa: E402
+from modules import (  # noqa: E402
+    binance_publisher,
+    content_generator,
+    engagement_assistant,
+    image_generator,
+    smart_selector,
+)
 
 
 SAMPLE_COIN = {
@@ -188,6 +194,91 @@ class EngagementTest(unittest.TestCase):
         self.assertEqual(plan[0]["minute_offset"], 5)
         # Plan text should be in Arabic.
         self.assertTrue(any("\u0600" <= c <= "\u06FF" for c in plan[0]["action"]))
+
+
+class BinancePublisherTest(unittest.TestCase):
+    def test_queued_post_renders_hashtags(self):
+        p = binance_publisher.QueuedPost(
+            text="$BTC حركة قوية",
+            hashtags=["BTC", "#Bitcoin", "$ETH"],
+        )
+        body = p.render_body()
+        self.assertIn("$BTC حركة قوية", body)
+        self.assertIn("#BTC", body)
+        self.assertIn("#Bitcoin", body)
+        # cashtag prefix should be replaced by # in hashtags.
+        self.assertIn("#ETH", body)
+
+    def test_queued_post_does_not_double_tag(self):
+        p = binance_publisher.QueuedPost(
+            text="hello #BTC #ETH",
+            hashtags=["BTC", "ETH"],
+        )
+        body = p.render_body()
+        # already-present hashtags should not be duplicated.
+        self.assertEqual(body.count("#BTC"), 1)
+        self.assertEqual(body.count("#ETH"), 1)
+
+    def test_publish_text_dry_run_returns_success(self):
+        pub = binance_publisher.SquarePublisher(api_key="")
+        r = pub.publish_text("hello world", dry_run=True)
+        self.assertTrue(r.success)
+        self.assertTrue(r.dry_run)
+        self.assertEqual(r.code, "000000")
+
+    def test_publish_text_empty_body_fails(self):
+        pub = binance_publisher.SquarePublisher(api_key="")
+        r = pub.publish_text("   ", dry_run=True)
+        self.assertFalse(r.success)
+        self.assertEqual(r.code, "20020")
+
+    def test_publish_queue_dry_run_no_real_sleep(self):
+        import random as _rand
+        rng = _rand.Random(42)
+        sleeps: list[float] = []
+        events: list[tuple[str, dict]] = []
+
+        def fake_sleep(seconds: float) -> None:
+            sleeps.append(seconds)
+
+        posts = [
+            {"text": "post 1 $BTC", "hashtags": ["BTC"]},
+            {"text": "post 2 $ETH", "hashtags": ["ETH"]},
+            {"text": "post 3 $SOL", "hashtags": ["SOL"]},
+        ]
+        results = binance_publisher.publish_queue(
+            posts, dry_run=True, shuffle=False,
+            min_delay_min=5, max_delay_min=30,
+            sleep_fn=fake_sleep, rng=rng,
+            on_event=lambda s, p: events.append((s, p)),
+        )
+        # All three should succeed in dry-run.
+        self.assertEqual(len(results), 3)
+        self.assertTrue(all(r.success for r in results))
+        # Two waits happen between three posts (no wait after the last).
+        wait_events = [e for e in events if e[0] == "waiting"]
+        self.assertEqual(len(wait_events), 2)
+        for _, payload in wait_events:
+            self.assertGreaterEqual(payload["minutes"], 5)
+            self.assertLessEqual(payload["minutes"], 30)
+        # sleep_fn should have been called twice with the same totals.
+        self.assertEqual(len(sleeps), 2)
+        self.assertEqual(int(sleeps[0]), wait_events[0][1]["minutes"] * 60)
+
+    def test_publish_queue_shuffles(self):
+        import random as _rand
+        # Seed picked so that order changes from input.
+        rng = _rand.Random(1)
+        posts = [{"text": f"p{i}"} for i in range(5)]
+        events: list[tuple[str, dict]] = []
+        binance_publisher.publish_queue(
+            posts, dry_run=True, shuffle=True,
+            min_delay_min=0, max_delay_min=0,
+            sleep_fn=lambda s: None, rng=rng,
+            on_event=lambda s, p: events.append((s, p)),
+        )
+        publishing_events = [e[1] for e in events if e[0] == "publishing"]
+        self.assertEqual(len(publishing_events), 5)
 
 
 if __name__ == "__main__":
