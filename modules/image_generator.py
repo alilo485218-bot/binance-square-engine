@@ -142,8 +142,19 @@ def _render_signal_card(post: dict[str, Any]) -> Image.Image:
     cashtag = post.get("cashtag") or f"${coin}"
     side = post.get("side") or ("LONG" if direction == "up" else "SHORT")
     side_up = side.upper()
-    leverage = post.get("leverage") or 20
-    pnl = post.get("pnl_pct")
+    leverage_raw = post.get("leverage") or 20
+    # Strip a trailing "x" if the caller passed "20x" instead of 20.
+    leverage = str(leverage_raw).rstrip("xX")
+    pnl_raw = post.get("pnl_pct")
+    pnl: float | None
+    if pnl_raw is None or pnl_raw == "":
+        pnl = None
+    else:
+        try:
+            # Accept ints/floats AND strings like "+342%", "342", "-12.5%".
+            pnl = float(str(pnl_raw).replace("%", "").replace("+", "").strip())
+        except (TypeError, ValueError):
+            pnl = None
 
     # Top: cashtag + USDT Perpetual line
     top_font = _font(58, bold=True)
@@ -163,8 +174,11 @@ def _render_signal_card(post: dict[str, Any]) -> Image.Image:
     draw.text((bx + 16, by + 14), badge_text, font=badge_font, fill=(0, 0, 0))
 
     # Big PNL number — center hero
-    pnl_str = (f"+{pnl}%" if pnl is not None and pnl >= 0
-               else (f"{pnl}%" if pnl is not None else "BINANCE FUTURES"))
+    if pnl is None:
+        pnl_str = "BINANCE FUTURES"
+    else:
+        pnl_int = int(pnl) if pnl == int(pnl) else pnl
+        pnl_str = f"+{pnl_int}%" if pnl >= 0 else f"{pnl_int}%"
     pnl_font = _font(220, bold=True) if pnl is not None else _font(110, bold=True)
     pnl_w = draw.textlength(pnl_str, font=pnl_font)
     while pnl_w > CANVAS - PADDING * 2 and pnl_font.size > 80:
