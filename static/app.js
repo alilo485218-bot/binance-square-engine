@@ -98,17 +98,68 @@ function renderPosts(posts) {
     card.querySelector(".body").value = p.body || "";
     card.querySelector(".word-count").textContent = `${p.word_count || 0} كلمة`;
     card.querySelector(".cashtag").textContent = p.cashtag || "";
+    if (p.image_hook) {
+      card.querySelector(".hook-preview").innerHTML =
+        `<span class="hook-label">Hook بصري:</span><span class="hook-text">🎯 ${p.image_hook}</span>`;
+    }
     card.querySelector(".score-json").textContent =
       JSON.stringify(p.score?.breakdown || {}, null, 2);
 
     const post = p;
+    const renderImageSlot = (r, slot, withUpload) => {
+      post.image_hook = r.hook;
+      // publish_url = hosted_url لو رفعت، وإلا = public_url محلي
+      post.image_url = r.publish_url;
+      post.is_hosted = !!r.hosted_url;
+      const cacheBust = `${r.url}?t=${Date.now()}`;
+      const hookBadge = r.hook ? `<div class="hook-badge">🎯 ${r.hook}</div>` : "";
+      let hostStatus = "";
+      if (withUpload) {
+        if (r.hosted_url) {
+          hostStatus = `<div class="image-hint ok">✓ مرفوع لاستضافة عامة — سيُلصق رابطه في البوست.<br><span class="muted">${r.hosted_url}</span></div>`;
+        } else {
+          hostStatus = `<div class="image-hint warn">⚠️ تعذّر الرفع لاستضافة عامة (${r.host_error || "unknown"}). سيعمل البوست بنص فقط، حمّل الصورة يدويًا.</div>`;
+        }
+      } else {
+        hostStatus = `<div class="image-hint">معاينة محلية فقط. اضغط "رفع للاستضافة" لرفعها كرابط عام يدخل البوست تلقائيًا.</div>`;
+      }
+      slot.innerHTML = `
+        ${hookBadge}
+        <img src="${cacheBust}" alt="hook">
+        <div class="image-actions">
+          <a class="btn-mini" href="${r.url}" download>⬇️ تنزيل PNG</a>
+          <button class="btn-mini btn-copy-url">📋 نسخ الرابط</button>
+          <button class="btn-mini btn-upload-img">☁️ رفع للاستضافة</button>
+        </div>
+        ${hostStatus}
+      `;
+      slot.querySelector(".btn-copy-url").addEventListener("click", () => {
+        navigator.clipboard.writeText(post.image_url);
+        const btn = slot.querySelector(".btn-copy-url");
+        const t = btn.textContent; btn.textContent = "✓ تم النسخ";
+        setTimeout(() => btn.textContent = t, 1200);
+      });
+      slot.querySelector(".btn-upload-img").addEventListener("click", async (ev) => {
+        const ub = ev.target; ub.disabled = true; ub.textContent = "جاري الرفع...";
+        try {
+          post.body = card.querySelector(".body").value;
+          const r2 = await api("/api/image", { post, upload: true });
+          renderImageSlot(r2, slot, true);
+        } catch (err2) {
+          alert("فشل الرفع: " + err2.message);
+        } finally {
+          ub.disabled = false;
+        }
+      });
+    };
+
     card.querySelector(".btn-image").addEventListener("click", async (e) => {
       const b = e.target; b.disabled = true; b.textContent = "جاري الرسم...";
       try {
         post.body = card.querySelector(".body").value;
-        const r = await api("/api/image", { post });
+        const r = await api("/api/image", { post, upload: false });
         const slot = card.querySelector(".image-slot");
-        slot.innerHTML = `<img src="${r.url}?t=${Date.now()}" alt="hook">`;
+        renderImageSlot(r, slot, false);
       } catch (err) { alert("فشل توليد الصورة: " + err.message); }
       finally { b.disabled = false; b.textContent = "🎨 توليد الصورة"; }
     });
@@ -143,7 +194,10 @@ function renderPosts(posts) {
       if (live && !confirm("سيتم نشر البوست فعليًا على حسابك في Binance Square. متأكد؟")) return;
       b.disabled = true; b.textContent = live ? "جاري النشر..." : "جاري التجربة...";
       try {
-        const r = await api("/api/publish/single", { text, hashtags, dry_run: !live });
+        const r = await api("/api/publish/single", {
+          text, hashtags, dry_run: !live,
+          image_url: post.image_url || null,
+        });
         const slot = card.querySelector(".publish-result");
         slot.classList.remove("hidden");
         if (r.success) {

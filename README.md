@@ -108,7 +108,15 @@ Score (0–100), updated for the CryptoZhiga style:
 
 The UI sorts posts best-first and shows the breakdown so you learn what works.
 
-### 3.4 Image Hook Generator — `modules/image_generator.py`
+### 3.4 Hook Extractor — `modules/hook_extractor.py`
+Every post automatically gets a 3–5 word punchy **image_hook**:
+- Gemini LLM (few-shot prompt with power-word constraints) when `GEMINI_API_KEY` is set.
+- Deterministic fallback templates by post type (signal/giveaway/news/debate/analysis/wrap_up).
+- Power-word lexicon: BREAKOUT · PUMP · DUMP · TRAP · ALERT · MOON · READY · NOW · DANGER · ZONE · RUG · SURGE · CRASH.
+- Post-validates: 3–5 UPPERCASE Latin words, cashtag preserved, junk single letters rejected.
+- Bound to the post in `content_generator.generate_post()` — no extra UI clicks needed.
+
+### 3.5 Image Hook Generator — `modules/image_generator.py`
 Two render modes (auto-selected by `post.type`):
 
 **Signal mode** — Binance-Futures-style PNL share card:
@@ -118,23 +126,36 @@ Two render modes (auto-selected by `post.type`):
 - Entry / SL / TP1 / TP2 / TP3 rows (label left, value right).
 - Centered `SIGNAL · Binance Square` footer.
 
-**Default mode** (analysis / debate / news / wrap_up / giveaway):
-- Big centered headline using `hook_keywords` (Latin uppercase, since Pillow doesn't shape Arabic).
-- Cashtag top-left, 24h change top-right with ▲/▼.
-- Type tag bottom-left.
+**Punchy hook mode** (analysis / debate / news / wrap_up / giveaway):
+- **3–5 word** Hook center-stage, biggest font that fits, heavy 8-direction outline for max contrast (CTR-optimized).
+- Side color bars (left + right edge) act as the visual identifier.
+- Cashtag top-left, post-type badge bottom-left, `BINANCE SQUARE` brand bottom-right.
+
+Smart palette mapping:
+- **Up / Long** → green (`14,203,129`).
+- **Down / Short** → red (`246,70,93`).
+- **News** → yellow (`252,213,53`).
+- **Giveaway** → bright yellow background + black text (maximum scroll-stop).
+- **Flat / other** → Binance gold (`240,185,11`).
 
 Both modes:
-- 1080×1080 PNG, direction-aware palette (green=up, red=down, gold=flat).
+- 1080×1080 PNG, contrast-aware outline (white outline on dark text, black outline on light text).
 - No external assets — uses DejaVu Sans (preinstalled on Linux/CI) with system-font fallback.
 
-### 3.5 Scheduler — `modules/scheduler.py`
+### 3.5.1 Image Host — `modules/image_host.py`
+Because Binance Square OpenAPI is **text-only**, the image needs a public URL to be embedded in the post body:
+- `IMGBB_API_KEY` (recommended): free, fast, durable URL.
+- `0x0.st` fallback: no signup, ~30-day URL expiry.
+- If both fail, the engine keeps a local `output/<id>.png` and the UI shows a "Download PNG" button so you can upload manually on the Binance Square mobile app (still 5 seconds).
+
+### 3.6 Scheduler — `modules/scheduler.py`
 - APScheduler `BackgroundScheduler` in UTC.
 - `schedule_post_reminder(post_id, fire_at_utc)` queues a reminder at a UTC ISO time.
 - `schedule_engagement_pings(post_id, published_at_utc)` queues +5/+15/+30/+45/+60 minute pings.
 - `prime_windows_today()` lists today's remaining UTC slots (`13, 14, 15, 16, 19, 20`).
 - All reminders persist to `data/schedule_queue.json`.
 
-### 3.6 Engagement Assistant — `modules/engagement_assistant.py`
+### 3.7 Engagement Assistant — `modules/engagement_assistant.py`
 - `generate_reply(post_body, comment)` → ≤25-word reply, language-matched (Arabic/English), ends with a question.
 - `reminder_plan(post_id)` → the **first-hour playbook**:
   | t+min | Action |

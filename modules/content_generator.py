@@ -294,6 +294,17 @@ def generate_post(prompt_type: str, signal: dict[str, Any]) -> dict[str, Any]:
     post["id"] = uuid.uuid4().hex[:10]
     post["source_signal"] = signal
     post["word_count"] = len(re.findall(r"\w+", post.get("body", "")))
+
+    # Stamp a 3-5 word punchy Hook for the image renderer + UI preview.
+    # We import here to avoid a circular module-load loop with hook_extractor
+    # (which itself may import nothing from this module today, but we keep the
+    # late import as a future-proofing guard).
+    from modules import hook_extractor  # noqa: PLC0415
+    try:
+        post["image_hook"] = hook_extractor.extract_hook(post)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[content_generator] hook_extractor failed: {exc}")
+        post["image_hook"] = hook_extractor.fallback_hook(post)
     return post
 
 

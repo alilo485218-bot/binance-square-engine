@@ -45,6 +45,14 @@ PUBLISH_MIN_DELAY_MIN = int(os.getenv("PUBLISH_MIN_DELAY_MIN", "5"))
 PUBLISH_MAX_DELAY_MIN = int(os.getenv("PUBLISH_MAX_DELAY_MIN", "30"))
 PUBLISH_DAILY_CAP = int(os.getenv("PUBLISH_DAILY_CAP", "12"))
 
+# --- Image hosting (so hook images can be embedded into posts) ---
+# ImgBB is the recommended hoster (free, fast, no expiry on default).
+# Sign up at https://imgbb.com/ -> Account -> API Key.
+# Without it the system falls back to 0x0.st (no signup, but link expires in ~30d).
+IMGBB_API_KEY = os.getenv("IMGBB_API_KEY", "").strip()
+AUTO_UPLOAD_IMAGE = os.getenv("AUTO_UPLOAD_IMAGE", "0").strip() not in ("0", "false", "False")
+
 # --- Feature flags ---
 HAS_LLM = bool(GEMINI_API_KEY)
 HAS_SQUARE_API = bool(SQUARE_OPENAPI_KEY)
+HAS_IMAGE_HOST = bool(IMGBB_API_KEY) or True  # 0x0.st always available as fallback

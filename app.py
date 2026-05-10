@@ -27,6 +27,7 @@ from modules import (
     content_generator,
     engagement_assistant,
     image_generator,
+    image_host,
     scheduler,
     smart_selector,
     trend_engine,
@@ -92,12 +93,44 @@ def api_select() -> Any:
 
 @app.route("/api/image", methods=["POST"])
 def api_image() -> Any:
-    post = (request.get_json(silent=True) or {}).get("post")
+    """يولّد صورة Hook + يرجع رابط عام صالح للإرسال مع البوست.
+
+    Body: {post, upload?}.
+      - upload=true  → يرفع الصورة لاستضافة عامة (ImgBB إن وُجد المفتاح، 0x0.st احتياط).
+      - upload=false (افتراضي) → يرجع رابط داخلي فقط (للمعاينة/التحميل).
+    """
+    body = request.get_json(silent=True) or {}
+    post = body.get("post")
     if not post:
         return jsonify({"error": "missing 'post' in body"}), 400
+    upload = bool(body.get("upload", config.AUTO_UPLOAD_IMAGE))
+
     path = image_generator.render_hook_image(post)
     fname = os.path.basename(path)
-    return jsonify({"path": path, "url": f"/output/{fname}"})
+    rel_url = f"/output/{fname}"
+    local_public_url = request.host_url.rstrip("/") + rel_url
+
+    # رابط القرار: لو upload=True نحاول رفع لاستضافة عامة، وإلا نستخدم المحلي.
+    hosted_url: str | None = None
+    host_error: str | None = None
+    if upload:
+        try:
+            hosted_url = image_host.upload_to_public(path)
+            if not hosted_url:
+                host_error = "image host did not return a URL"
+        except Exception as exc:  # noqa: BLE001
+            host_error = str(exc)
+
+    publish_url = hosted_url or local_public_url
+    return jsonify({
+        "path": path,
+        "url": rel_url,
+        "public_url": local_public_url,
+        "hosted_url": hosted_url,
+        "publish_url": publish_url,
+        "host_error": host_error,
+        "hook": post.get("image_hook"),
+    })
 
 
 @app.route("/api/reply", methods=["POST"])
@@ -145,16 +178,25 @@ def api_reminder_plan(post_id: str) -> Any:
 
 @app.route("/api/publish/single", methods=["POST"])
 def api_publish_single() -> Any:
-    """Publish ONE post immediately. Body: {text, hashtags?, dry_run?}."""
+    """Publish ONE post immediately.
+
+    Body: {text, hashtags?, dry_run?, image_url?}.
+    `image_url`: رابط عام للصورة — يُلصق في آخر الـ body.
+    """
     body = request.get_json(silent=True) or {}
     text = (body.get("text") or "").strip()
     if not text:
         return jsonify({"error": "text is required"}), 400
     hashtags = list(body.get("hashtags") or [])
+    image_url = (body.get("image_url") or "").strip() or None
     dry_run = bool(body.get("dry_run", config.PUBLISH_DRY_RUN_DEFAULT))
-    post = binance_publisher.QueuedPost(text=text, hashtags=hashtags)
+    post = binance_publisher.QueuedPost(
+        text=text, hashtags=hashtags, image_url=image_url,
+    )
     publisher = binance_publisher.SquarePublisher()
-    result = publisher.publish_text(post.render_body(), dry_run=dry_run)
+    result = publisher.publish_text(
+        post.render_body(), dry_run=dry_run, image_url=image_url,
+    )
     return jsonify({
         "success": result.success,
         "dry_run": result.dry_run,
@@ -164,6 +206,8 @@ def api_publish_single() -> Any:
         "post_url": result.post_url,
         "error": result.error,
         "attempts": result.attempts,
+        "image_url": image_url,
+        "body_preview": post.render_body()[:240],
     })
 
 

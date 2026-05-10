@@ -26,6 +26,7 @@ from modules import (  # noqa: E402
     binance_publisher,
     content_generator,
     engagement_assistant,
+    hook_extractor,
     image_generator,
     smart_selector,
 )
@@ -168,6 +169,61 @@ class ImageGeneratorTest(unittest.TestCase):
         path = image_generator.render_hook_image(post)
         self.assertTrue(os.path.exists(path))
         self.assertGreater(os.path.getsize(path), 8_000)
+
+    def test_punchy_hook_image_stores_hook(self):
+        post = content_generator.generate_post("analysis", SAMPLE_COIN_UP)
+        image_generator.render_hook_image(post)
+        # punchy renderer stamps the chosen hook on the post dict
+        self.assertIn("image_hook", post)
+        self.assertGreaterEqual(len(post["image_hook"].split()), 2)
+        self.assertLessEqual(len(post["image_hook"].split()), 5)
+        # Hook is always uppercase, Latin-only
+        for ch in post["image_hook"]:
+            self.assertTrue(ch.isascii(), f"non-ascii in hook: {ch!r}")
+
+
+class HookExtractorTest(unittest.TestCase):
+    def test_fallback_up_uses_pump(self):
+        post = {"type": "analysis", "coin": "BTC", "cashtag": "$BTC",
+                "direction": "up", "body": "BTC bullish"}
+        h = hook_extractor.extract_hook(post)
+        self.assertIn("$BTC", h)
+        self.assertTrue("PUMP" in h or "BREAKOUT" in h or "READY" in h)
+
+    def test_fallback_down_uses_alert(self):
+        post = {"type": "analysis", "coin": "DOGE", "cashtag": "$DOGE",
+                "direction": "down", "body": "DOGE bearish"}
+        h = hook_extractor.extract_hook(post)
+        self.assertTrue(
+            "DANGER" in h or "DUMP" in h or "ALERT" in h or "TRAP" in h
+        )
+
+    def test_giveaway_hook_is_free_usdt(self):
+        post = {"type": "giveaway", "coin": "BNB", "cashtag": "$BNB"}
+        h = hook_extractor.extract_hook(post)
+        self.assertIn("FREE", h)
+        self.assertIn("USDT", h)
+
+    def test_news_hook_is_breaking(self):
+        post = {"type": "news", "coin": "SOL", "cashtag": "$SOL"}
+        h = hook_extractor.extract_hook(post)
+        self.assertIn("BREAKING", h)
+
+    def test_hook_is_uppercase_latin(self):
+        post = {"type": "analysis", "coin": "BTC", "cashtag": "$BTC",
+                "direction": "up", "body": "بيتكوين قوي"}
+        h = hook_extractor.extract_hook(post)
+        self.assertEqual(h, h.upper())
+        for ch in h:
+            self.assertTrue(ch.isascii())
+
+    def test_hook_word_count_bounded(self):
+        post = {"type": "analysis", "coin": "BTC", "cashtag": "$BTC",
+                "direction": "flat", "body": "x" * 200}
+        h = hook_extractor.extract_hook(post)
+        words = h.split()
+        self.assertGreaterEqual(len(words), 2)
+        self.assertLessEqual(len(words), 5)
 
 
 class EngagementTest(unittest.TestCase):

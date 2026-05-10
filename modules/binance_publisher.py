@@ -72,11 +72,18 @@ class QueuedPost:
     """بوست جاهز للنشر."""
     text: str
     image_path: str | None = None
+    image_url: str | None = None  # رابط الصورة الـ public (يُلصق في الـ body)
     hashtags: list[str] = field(default_factory=list)
     post_id: str | None = None  # مرجع داخلي اختياري
 
     def render_body(self) -> str:
-        """يدمج النص + الهاشتاقات في حقل bodyTextOnly واحد."""
+        """يدمج النص + الهاشتاقات + رابط الصورة في حقل bodyTextOnly واحد.
+
+        Binance Square OpenAPI حاليًا يدعم فقط `bodyTextOnly` (نص فقط، لا حقل
+        للصور). لأن صورة Hook جزء حيوي من الـ funnel، نجعل رابطها
+        العام يدخل body كسطر أخير (Binance Square renderer يتعرف على
+        روابط .png/.jpg ويحولها إلى بطاقة معاينة تلقائيًا).
+        """
         body = self.text.strip()
         if self.hashtags:
             tag_line = " ".join(
@@ -85,6 +92,8 @@ class QueuedPost:
             )
             if tag_line and tag_line not in body:
                 body = f"{body}\n\n{tag_line}"
+        if self.image_url and self.image_url not in body:
+            body = f"{body}\n\n📸 {self.image_url}"
         return body
 
 
@@ -152,8 +161,20 @@ class SquarePublisher:
         return f"{self.api_key[:5]}...{self.api_key[-4:]}"
 
     # -- نشر بوست واحد --
-    def publish_text(self, body: str, dry_run: bool | None = None) -> PublishResult:
-        """ينشر نصًا واحدًا. dry_run=None يعني استخدام الإعداد الافتراضي."""
+    def publish_text(
+        self,
+        body: str,
+        dry_run: bool | None = None,
+        image_url: str | None = None,
+    ) -> PublishResult:
+        """ينشر نصًا واحدًا.
+
+        Args:
+            body: نص البوست (bodyTextOnly).
+            dry_run: None → استخدم الإعداد الافتراضي.
+            image_url: رابط صورة (سيُرسل أيضًا في حقول imageUrl/imageUrls/mediaUrls
+                للتوافق المستقبلي إذا فتحت Binance دعم الصور في OpenAPI).
+        """
         if dry_run is None:
             dry_run = config.PUBLISH_DRY_RUN_DEFAULT or not self.api_key
 
@@ -186,6 +207,13 @@ class SquarePublisher:
         last_message: str | None = None
         for attempt in range(1, self.max_retries + 1):
             try:
+                payload_obj: dict[str, Any] = {"bodyTextOnly": body}
+                if image_url:
+                    # حقول احتياطية، Binance وثّق bodyTextOnly فقط لكن الأخريات
+                    # تُقبل بصمت (000000) — لو فعيلت يومًا، ستتفعل تلقائيًا.
+                    payload_obj["imageUrl"] = image_url
+                    payload_obj["imageUrls"] = [image_url]
+                    payload_obj["mediaUrls"] = [image_url]
                 resp = requests.post(
                     self.api_url,
                     headers={
@@ -193,7 +221,7 @@ class SquarePublisher:
                         "Content-Type": "application/json",
                         "clienttype": "binanceSkill",
                     },
-                    data=json.dumps({"bodyTextOnly": body}),
+                    data=json.dumps(payload_obj),
                     timeout=self.timeout,
                 )
             except requests.RequestException as exc:
@@ -334,6 +362,7 @@ def publish_queue(
             queue.append(QueuedPost(
                 text=str(raw.get("text", "")),
                 image_path=raw.get("image_path") or None,
+                image_url=raw.get("image_url") or None,
                 hashtags=list(raw.get("hashtags") or []),
                 post_id=str(raw.get("post_id")) if raw.get("post_id") else None,
             ))
@@ -357,7 +386,7 @@ def publish_queue(
             on_event("publishing", {"index": idx, "total": len(queue), "post_id": post.post_id})
 
         body = post.render_body()
-        result = publisher.publish_text(body, dry_run=dry_run)
+        result = publisher.publish_text(body, dry_run=dry_run, image_url=post.image_url)
         results.append(result)
 
         if on_event:
@@ -366,6 +395,7 @@ def publish_queue(
                 "success": result.success, "code": result.code,
                 "post_url": result.post_url, "error": result.error,
                 "image_path": post.image_path,
+                "image_url": post.image_url,
             })
 
         if result.success and not result.dry_run:
