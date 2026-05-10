@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>محرّك محتوى Binance Square — مستوحى من CryptoZhiga</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>محرّك محتوى Binance Square</h1>
+    <p class="sub">
+      مساعد نشر ذكي · للوصول إلى Top 10 (Write to Earn) · مبني على استراتيجية CryptoZhiga ·
+      Gemini: <span class="{% if has_llm %}ok{% else %}warn{% endif %}">
+        {% if has_llm %}متصل{% else %}غير متصل (يستخدم القوالب البديلة){% endif %}
+      </span> ·
+      نشر تلقائي: <span class="{% if has_square_api %}ok{% else %}warn{% endif %}">
+        {% if has_square_api %}مفعّل{% else %}غير مفعّل (Dry-Run){% endif %}
+      </span>
+    </p>
+  </header>
+
+  <section class="bar">
+    <button id="btn-trends">١ · جلب الترند</button>
+    <button id="btn-generate">٢ · توليد البوستات</button>
+    <button id="btn-windows">⏰ نوافذ النشر الذهبية (UTC)</button>
+    <button id="btn-plan" class="secondary">📋 خطة أول ساعة</button>
+  </section>
+
+  <section id="trends-block" class="block">
+    <h2>الترند</h2>
+    <div id="trends-empty" class="empty">لا يوجد ترند بعد. اضغط <b>جلب الترند</b>.</div>
+    <div id="trends"></div>
+  </section>
+
+  <section id="posts-block" class="block">
+    <h2>البوستات المُوَلَّدة (مرتبة حسب التقييم)</h2>
+    <div id="posts-empty" class="empty">لا يوجد بوستات بعد. اضغط <b>توليد البوستات</b>.</div>
+    <div id="posts"></div>
+  </section>
+
+  <section id="windows-block" class="block hidden">
+    <h2>نوافذ النشر الذهبية المتبقية اليوم (UTC)</h2>
+    <div id="windows"></div>
+  </section>
+
+  <section id="plan-block" class="block hidden">
+    <h2>خطة أول ساعة بعد النشر — سرّ الـ Top 10</h2>
+    <ol id="plan-list" class="plan"></ol>
+  </section>
+
+  <template id="post-card-tpl">
+    <div class="post" data-id="">
+      <div class="post-head">
+        <span class="badge type"></span>
+        <span class="badge dir"></span>
+        <span class="score"></span>
+      </div>
+      <div class="hook-preview"></div>
+      <textarea class="body" rows="6" dir="auto"></textarea>
+      <div class="meta">
+        <span class="word-count"></span>
+        <span class="cashtag"></span>
+      </div>
+      <div class="actions">
+        <button class="btn-image">🎨 توليد الصورة</button>
+        <button class="btn-copy">📋 نسخ النص</button>
+        <button class="btn-schedule">⏰ تذكير نشر</button>
+        <button class="btn-reply-tool">💬 أداة الرد</button>
+        <button class="btn-publish-dry" title="نشر تجريبي (لا يُرسل إلى Binance)">🧪 تجربة نشر</button>
+        <button class="btn-publish-live" title="نشر فعلي عبر Binance Square OpenAPI">🚀 نشر الآن</button>
+      </div>
+      <div class="publish-result hidden"></div>
+      <div class="image-slot"></div>
+      <div class="reply-slot hidden">
+        <textarea class="comment-in" rows="2" dir="auto"
+          placeholder="ألصق هنا تعليقًا تلقاه على البوست..."></textarea>
+        <button class="btn-make-reply">توليد رد</button>
+        <pre class="reply-out"></pre>
+      </div>
+      <details class="score-detail">
+        <summary>لماذا هذا التقييم؟</summary>
+        <pre class="score-json"></pre>
+      </details>
+    </div>
+  </template>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
